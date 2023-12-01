@@ -19,11 +19,11 @@ $nom = $quel_nom.ToLower()
 
 $complet = $prenom.Substring(0,1)+"."+$nom
 $nom_afficher = $quel_prenom +" "+$quel_nom
-$mail = $complet + "@AXEPLANE.LOC"
+$mail = $complet + "@yourdomain.ext"
 $mail = $mail.ToLower()
 
 write-host "Voici la liste des services dsiponibles : "-ForegroundColor Green
-$services = Get-ADOrganizationalUnit -SearchBase "OU=Users group,DC=AXEPLANE,DC=LOC" -searchscope 1 -Filter * | select Name
+    $services = Get-ADOrganizationalUnit -SearchBase "OU=Users group,DC=YOURDOMAIN,DC=EXT" -searchscope 1 -Filter * | select Name
 foreach ($services in $services) {
     write-host $services.name
 }
@@ -37,9 +37,11 @@ $Title = Read-Host
 write-host "Quel est le mot de passe? (Il faut obligatoirement 12 caractères minimum, avec majuscule et chiffre..." -ForegroundColor Green
 $password = Read-Host 
 
+$folderpath = "C:\\your\path\to\folder\$complet"
+
 ### Création de l'utilisateur --------------------------------------------------------------------------------------------
 try{
-New-ADUser -Name $nom_afficher -SamAccountName $complet -AccountPassword (ConvertTo-SecureString $password -AsPlainText -Force) -ChangePasswordAtLogon $true -DisplayName $nom_afficher -EmailAddress $mail -Enabled 1 -GivenName $quel_nom -Surname $quel_prenom -Title $Title -OtherAttributes @{'userPrincipalName'="$mail";'distinguishedName'="CN=$nom_afficher,OU=$Services,OU=Users group,DC=AXEPLANE,DC=LOC"}
+New-ADUser -Name $nom_afficher -SamAccountName $complet -AccountPassword (ConvertTo-SecureString $password -AsPlainText -Force) -ChangePasswordAtLogon $true -DisplayName $nom_afficher -EmailAddress $mail -Enabled 1 -GivenName $quel_nom -Surname $quel_prenom -Title $Title -OtherAttributes @{'userPrincipalName'="$mail";'distinguishedName'="CN=$nom_afficher,OU=$Services,OU=Users group,DC=YOURDOMAIN,DC=EXT"}
 Add-ADGroupMember -Identity "$services" -Members "$complet"
 Write-host "le compte " $complet "est maintenant créé !" -ForegroundColor Green
 write-host "------------------"
@@ -52,7 +54,7 @@ catch{
 #création dossier personnel-----------------------------------------------------------------------------------------------
 
 try{
-$folderpath = "E:\Partages_personnels_utilisateurs\$complet"
+
 
 New-Item -ItemType Directory -Path "$folderpath" 
 }
@@ -68,7 +70,7 @@ try{
 
 New-SmbShare -Name $complet -Path "$folderpath" -ChangeAccess "$mail" 
 
-Set-ADUser $complet -HomeDrive "P:" -HomeDirectory "\\SRV-AD\Partages_personnels_utilisateurs\$complet" -Enabled $true 
+Set-ADUser $complet -HomeDrive "P:" -HomeDirectory "\\your\path\to\folder\$complet" -Enabled $true 
 
 }
 catch{
