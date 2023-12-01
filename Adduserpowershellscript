@@ -1,0 +1,91 @@
+<#
+Script intégration utilisateur 
+Author : Belvalette Cyril
+Description : ajout d'un utilisateur à l'AD
+V:2.0
+#>
+
+### Demande des informations --------------------------------------------------------------------------------------------
+
+write-host "Intégration d'utilisateur à l'AD" -ForegroundColor Red
+
+write-host "Quel est le prénom ?" -ForegroundColor Green
+$quel_prenom = Read-Host
+$prenom = $quel_prenom.ToLower()
+
+write-host "Quel est le nom ?" -ForegroundColor Green
+$quel_nom = Read-Host 
+$nom = $quel_nom.ToLower()
+
+$complet = $prenom.Substring(0,1)+"."+$nom
+$nom_afficher = $quel_prenom +" "+$quel_nom
+$mail = $complet + "@AXEPLANE.LOC"
+$mail = $mail.ToLower()
+
+write-host "Voici la liste des services dsiponibles : "-ForegroundColor Green
+$services = Get-ADOrganizationalUnit -SearchBase "OU=Users group,DC=AXEPLANE,DC=LOC" -searchscope 1 -Filter * | select Name
+foreach ($services in $services) {
+    write-host $services.name
+}
+
+write-host "Taper le service de l'utilisateur " -ForegroundColor Green
+$services = Read-Host
+
+write-host "Quel est le titre de l'utilisateur ?" -ForegroundColor Green
+$Title = Read-Host
+
+write-host "Quel est le mot de passe? (Il faut obligatoirement 12 caractères minimum, avec majuscule et chiffre..." -ForegroundColor Green
+$password = Read-Host 
+
+### Création de l'utilisateur --------------------------------------------------------------------------------------------
+try{
+New-ADUser -Name $nom_afficher -SamAccountName $complet -AccountPassword (ConvertTo-SecureString $password -AsPlainText -Force) -ChangePasswordAtLogon $true -DisplayName $nom_afficher -EmailAddress $mail -Enabled 1 -GivenName $quel_nom -Surname $quel_prenom -Title $Title -OtherAttributes @{'userPrincipalName'="$mail";'distinguishedName'="CN=$nom_afficher,OU=$Services,OU=Users group,DC=AXEPLANE,DC=LOC"}
+Add-ADGroupMember -Identity "$services" -Members "$complet"
+Write-host "le compte " $complet "est maintenant créé !" -ForegroundColor Green
+write-host "------------------"
+}
+catch{
+      Write-Host "Une erreur est survenu pendant la création de l'utilisateur : $_"
+      Write-Host "Le compte n'a pas été créé ! "
+      }
+
+#création dossier personnel-----------------------------------------------------------------------------------------------
+
+try{
+$folderpath = "E:\Partages_personnels_utilisateurs\$complet"
+
+New-Item -ItemType Directory -Path "$folderpath" 
+}
+
+catch{
+      Write-Host "Une erreur est survenu pendant la création du dossier de l'utilisateur : $_"
+      Write-Host "Le dossier n'a pas été créé ! "
+      }
+
+#Partage sur le réseau----------------------------------------------------------------------------------------------------
+
+try{
+
+New-SmbShare -Name $complet -Path "$folderpath" -ChangeAccess "$mail" 
+
+Set-ADUser $complet -HomeDrive "P:" -HomeDirectory "\\SRV-AD\Partages_personnels_utilisateurs\$complet" -Enabled $true 
+
+}
+catch{
+      Write-Host "Une erreur est survenu pendant l'attribution des droits au dossier de l'utilisateur : $_"
+      Write-Host "Les droits ne sont pas configuré correctement !"
+      }
+
+#Ajout des autorisations NTFS---------------------------------------------------------------------------------------------
+
+try{
+Add-NTFSAccess -Path "$folderpath" -Account "$complet" -AccessRights FullControl 
+$acl = Get-Acl -Path $folderpath
+$acl.SetAccessRuleProtection($true, $false)
+Set-Acl -Path $folderpath -AclObject $acl
+}
+catch{
+      Write-Host "Une erreur est survenu pendant l'attribution des droits au dossier de l'utilisateur : $_"
+      Write-Host "Les droits ne sont pas configuré correctement !"
+      }
+      
